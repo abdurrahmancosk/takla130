@@ -1,0 +1,63 @@
+name: APK derle
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: three.js indir
+        run: bash tools/three-indir.sh
+
+      - name: Gradle önbelleği
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: APK derle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: APK'yı adlandır
+        run: |
+          mkdir -p cikti
+          cp android/app/build/outputs/apk/release/app-release.apk "cikti/TAKLA-130-oyun-v1.0.${{ github.run_number }}.apk"
+          ls -la cikti
+
+      - name: APK'yı derleme çıktısı olarak sakla
+        uses: actions/upload-artifact@v4
+        with:
+          name: TAKLA-130-oyun-apk
+          path: cikti/*.apk
+
+      - name: Sürüm (Releases) sayfasına koy
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: TAKLA-130 Oyun v1.0.${{ github.run_number }}
+          body: |
+            Telefona/tablete indirip kurun: aşağıdaki .apk dosyası.
+            Redmi Note 9 Pro, Redmi 14C ve Huawei MatePad 11.5S için ayarlandı.
+          files: cikti/*.apk
+          make_latest: true

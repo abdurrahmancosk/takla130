@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>TAKLA-130</title>
+<style>
+:root {
+  --lime: #b9cf1f; --lime-d: #8fa416; --cob: #2b47c4; --ink: #14171b; --panel: rgba(18, 21, 26, 0.86); --panel2: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.14); --txt: #f2f4ee; --mut: #a9b0b8; --ok: #4cc48d; --warn: #f0a35c; --bad: #f07272;
+  --sa-l: 0px; --sa-r: 0px; --sa-t: 0px; --sa-b: 0px;
+  --f: "Roboto", "HarmonyOS Sans", "MiSans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1013; color: var(--txt); font-family: var(--f); font-size: 15px;
+  user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
+canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+[hidden] { display: none !important; }
+button { font-family: inherit; color: inherit; cursor: pointer; border: 0; }
+.safe { padding-left: max(14px, var(--sa-l)); padding-right: max(14px, var(--sa-r)); padding-top: max(10px, var(--sa-t)); padding-bottom: max(10px, var(--sa-b)); }
+
+/* ------------------------------------------------ menüler */
+.screen { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20; background: linear-gradient(90deg, rgba(10, 12, 15, 0.92) 0%, rgba(10, 12, 15, 0.55) 55%, rgba(10, 12, 15, 0.2) 100%); }
+.card { width: min(980px, 100%); max-height: 100%; overflow-y: auto; display: grid; gap: 14px; align-content: start; touch-action: pan-y; }
+.title { font-weight: 900; font-style: italic; letter-spacing: -0.02em; font-size: clamp(36px, 7vh, 64px); line-height: 0.95; margin: 0; }
+.title b { color: var(--lime); }
+.sub { color: var(--mut); margin: 0; font-size: 14px; max-width: 52ch; }
+h2 { margin: 0; font-size: 22px; font-weight: 800; font-style: italic; }
+h3 { margin: 0; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mut); font-weight: 700; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.big { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; font-size: 16px; font-weight: 700; text-align: left; display: grid; gap: 2px; min-height: 48px; }
+.btn small { font-weight: 400; color: var(--mut); font-size: 12.5px; }
+.btn.pri { background: var(--lime); color: #15180a; border-color: transparent; }
+.btn.pri small { color: #3b4410; }
+.btn.blue { background: var(--cob); border-color: transparent; }
+.btn:active, .btn.press { transform: translateY(1px); filter: brightness(1.15); }
+.btn.sm { padding: 8px 12px; min-height: 38px; font-size: 14px; }
+.btn:disabled { opacity: 0.4; }
+.seg { display: inline-flex; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; flex-wrap: wrap; }
+.seg button { background: transparent; padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: 14px; min-height: 36px; }
+.seg button.on { background: var(--lime); color: #15180a; }
+input[type=text] { font: inherit; font-size: 18px; font-weight: 700; color: var(--txt); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; user-select: text; -webkit-user-select: text; }
+input[type=range] { width: 100%; accent-color: var(--lime); }
+.sw { width: 34px; height: 34px; border-radius: 50%; border: 3px solid transparent; }
+.sw.on { border-color: #fff; box-shadow: 0 0 0 2px var(--ink); }
+.list { display: grid; gap: 6px; }
+.item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--panel2); border-radius: 10px; min-height: 44px; }
+.item .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.item .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .meta { color: var(--mut); font-size: 12.5px; }
+.empty { color: var(--mut); font-size: 13.5px; padding: 6px 2px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; }
+.kv span:nth-child(odd) { color: var(--mut); }
+.track { text-align: left; background: var(--panel2); border: 2px solid transparent; border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }
+.track.on { border-color: var(--lime); }
+.track canvas { width: 100%; height: 70px; }
+.stat { display: grid; grid-template-columns: 110px 1fr 56px; gap: 8px; align-items: center; font-size: 13px; }
+.bar { height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--lime); border-radius: 4px; }
+.toggle { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 40px; }
+.note { color: var(--mut); font-size: 12.5px; line-height: 1.45; margin: 0; }
+.status { font-size: 12.5px; color: var(--mut); max-width: 46ch; text-align: right; }
+.status b { color: var(--ok); font-weight: 600; }
+.back { position: absolute; top: max(10px, var(--sa-t)); right: max(14px, var(--sa-r)); }
+
+/* ------------------------------------------------ oyun içi gösterge */
+#hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+#hud .tl { position: absolute; top: max(8px, var(--sa-t)); left: max(12px, var(--sa-l)); display: grid; gap: 6px; }
+#hud .tr { position: absolute; top: max(8px, var(--sa-t)); right: max(12px, var(--sa-r)); display: flex; gap: 8px; align-items: start; }
+.speed { font-weight: 900; font-style: italic; font-size: 38px; line-height: 1; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6); font-variant-numeric: tabular-nums; }
+.speed small { font-size: 14px; font-weight: 600; font-style: normal; color: var(--mut); margin-left: 4px; }
+.pill { background: var(--panel); border-radius: 10px; padding: 6px 10px; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; display: flex; gap: 12px; }
+.pill span { color: var(--mut); font-weight: 500; margin-right: 4px; }
+#stand { display: grid; gap: 3px; font-size: 13px; }
+#stand div { background: rgba(10, 12, 15, 0.6); border-radius: 6px; padding: 3px 8px; display: flex; gap: 6px; align-items: center; min-width: 150px; }
+#stand div.me { background: rgba(185, 207, 31, 0.85); color: #15180a; font-weight: 700; }
+#stand i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+#mini { width: 132px; height: 132px; border-radius: 12px; background: rgba(10, 12, 15, 0.6); }
+.hbtn { pointer-events: auto; width: 46px; height: 46px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 20px; font-weight: 800; display: grid; place-items: center; }
+#ctl { position: fixed; inset: 0; z-index: 9; touch-action: none; }
+.stick { position: fixed; width: 128px; height: 128px; margin: -64px 0 0 -64px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.28); background: rgba(255, 255, 255, 0.06); display: grid; place-items: center; opacity: 0.55; pointer-events: none; transition: opacity 0.15s; }
+.stick.on { opacity: 1; }
+.stick i { width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); display: block; }
+#stickL { left: 18%; top: 72%; } #stickR { left: 82%; top: 72%; }
+.hint { position: fixed; bottom: max(8px, var(--sa-b)); font-size: 11.5px; color: rgba(255, 255, 255, 0.55); pointer-events: none; z-index: 9; }
+#actions { position: fixed; right: max(16px, var(--sa-r)); bottom: 46%; z-index: 11; display: grid; gap: 10px; justify-items: end; }
+#bFlip { width: 78px; height: 78px; border-radius: 50%; background: var(--lime); color: #15180a; font-weight: 900; font-style: italic; font-size: 16px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); }
+#bFlip.cool { filter: grayscale(1) brightness(0.7); }
+.center { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 12; }
+#count { font-size: 120px; font-weight: 900; font-style: italic; color: var(--lime); text-shadow: 0 6px 30px rgba(0, 0, 0, 0.6); }
+#wrong { font-size: 32px; font-weight: 900; color: var(--bad); background: rgba(0, 0, 0, 0.55); padding: 8px 18px; border-radius: 12px; margin-top: -30vh; }
+#toast { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 13; font-size: 26px; font-weight: 900; font-style: italic; color: #fff; text-shadow: 0 3px 14px rgba(0, 0, 0, 0.7); pointer-events: none; opacity: 0; transition: opacity 0.25s; white-space: nowrap; }
+#toast.on { opacity: 1; }
+#tags { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; }
+.tag { position: absolute; left: 0; top: 0; font-size: 12px; font-weight: 700; background: rgba(10, 12, 15, 0.7); border-left: 4px solid #999; padding: 2px 7px; border-radius: 6px; white-space: nowrap; }
+.tag.bot { font-weight: 500; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; font-variant-numeric: tabular-nums; }
+td, th { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+th { font-size: 11.5px; color: var(--mut); letter-spacing: 0.08em; text-transform: uppercase; }
+tr.me td { color: var(--lime); font-weight: 800; }
+#loading { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: #0e1013; font-weight: 700; }
+@media (max-height: 420px) { .title { font-size: 34px; } .btn { padding: 9px 12px; min-height: 42px; font-size: 15px; } .box { padding: 10px; } .card { gap: 10px; } #mini { width: 104px; height: 104px; } .speed { font-size: 30px; } #bFlip { width: 66px; height: 66px; } }
+</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/jsm/" } }</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="tags"></div>
+
+<!-- oyun içi -->
+<div id="ctl" hidden></div>
+<div class="stick" id="stickL" hidden><i></i></div>
+<div class="stick" id="stickR" hidden><i></i></div>
+<div id="hud" hidden>
+  <div class="tl">
+    <div class="speed"><span id="hSpeed">0,0</span><small>km/h</small></div>
+    <div class="pill" id="raceInfo" hidden><div><span>TUR</span><b id="hLap">1/3</b></div><div><span>SIRA</span><b id="hPos">1/4</b></div><div><span>SÜRE</span><b id="hTime">0:00,0</b></div></div>
+    <div class="pill" id="lapInfo" hidden><div><span>SON</span><b id="hLast">–</b></div><div><span>EN İYİ</span><b id="hBest">–</b></div></div>
+    <div id="stand"></div>
+  </div>
+  <div class="tr">
+    <button class="hbtn" id="bReset" aria-label="Aracı düzelt">↻</button>
+    <button class="hbtn" id="bCam" aria-label="Kamera">◉</button>
+    <button class="hbtn" id="bPause" aria-label="Duraklat">II</button>
+    <canvas id="mini" width="264" height="264"></canvas>
+  </div>
+</div>
+<div id="actions" hidden><button id="bFlip">TAKLA</button></div>
+<div class="hint" id="hintL" style="left:25%;transform:translateX(-50%)" hidden>sol yarı: ileri / geri</div>
+<div class="hint" id="hintR" style="left:75%;transform:translateX(-50%)" hidden>sağ yarı: sağa / sola</div>
+<div class="center" id="countWrap" hidden><div id="count">3</div></div>
+<div class="center" id="wrongWrap" hidden><div id="wrong">YANLIŞ YÖN</div></div>
+<div id="toast"></div>
+
+<!-- ana menü -->
+<section class="screen safe" id="sMenu" hidden>
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:end">
+      <div style="display:grid;gap:6px">
+        <h1 class="title">TAKLA<b>-130</b></h1>
+        <p class="sub">Gerçek aracın birebir fiziğiyle mini şehirde sür, rampalardan atla, takla at, botlara ve aynı Wi-Fi'daki arkadaşlarına karşı yarış.</p>
+      </div>
+      <div class="status" id="netStatus"></div>
+    </div>
+    <div class="cols" style="grid-template-columns: minmax(240px, 0.8fr) minmax(280px, 1.2fr)">
+      <div class="box">
+        <h3>Pilot</h3>
+        <input type="text" id="pName" maxlength="14" autocomplete="off" spellcheck="false" aria-label="Oyuncu adı">
+        <div class="row" id="pColors"></div>
+        <p class="note">Bu ad ve renk ağdaki diğer oyunculara görünür.</p>
+      </div>
+      <div class="big">
+        <button class="btn pri" id="goFree">Serbest sürüş<small>Şehirde gez, rampalarda takla at</small></button>
+        <button class="btn" id="goRace">Yarış<small>Botlara karşı, 3 pist</small></button>
+        <button class="btn blue" id="goLobby">Wi-Fi çok oyunculu<small>Aynı ağdaki oyuncularla yarış</small></button>
+        <button class="btn" id="goGarage">Garaj<small>Dişli seti ve motor</small></button>
+        <button class="btn" id="goSettings">Ayarlar<small>Grafik, kontrol, ses</small></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- yarış kurulumu (tek oyunculu) -->
+<section class="screen safe" id="sRace" hidden>
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2>Yarış</h2><button class="btn sm" data-back>Geri</button></div>
+    <div class="cols" id="trackCards"></div>
+    <div class="cols">
+      <div class="box"><h3>Tur sayısı</h3><div class="seg" id="rLaps"></div></div>
+      <div class="box"><h3>Bot sayısı</h3><div class="seg" id="rBots"></div></div>
+      <div class="box"><h3>Bot zorluğu</h3><div class="seg" id="rDiff"></div></div>
+    </div>
+    <div class="row"><button class="btn pri" id="rStart" style="min-width:220px">Yarışı başlat</button></div>
+  </div>
+</section>
+
+<!-- çok oyunculu lobi -->
+<section class="screen safe" id="sLobby" hidden>
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2>Wi-Fi çok oyunculu</h2><button class="btn sm" data-back>Geri</button></div>
+    <div class="status" id="lobbyStatus"></div>
+    <div class="cols">
+      <div class="box"><h3>Ağdaki oyuncular</h3><div class="list" id="peerList"></div></div>
+      <div class="box"><h3>Açık odalar</h3><div class="list" id="roomList"></div>
+        <button class="btn sm" id="freeTogether">Birlikte serbest sür<small>Serbest sürüşteki herkes birbirini görür</small></button></div>
+      <div class="box"><h3>Oda kur</h3>
+        <div class="seg" id="oTrack"></div>
+        <div class="row"><span class="note">Tur</span><div class="seg" id="oLaps"></div></div>
+        <div class="row"><span class="note">Bot</span><div class="seg" id="oBots"></div></div>
+        <div class="row"><span class="note">Zorluk</span><div class="seg" id="oDiff"></div></div>
+        <label class="toggle"><span class="note">Herkes aynı araç (DENGE, standart motor)</span><input type="checkbox" id="oSame" checked></label>
+        <button class="btn pri" id="oCreate">Odayı kur</button></div>
+    </div>
+    <p class="note">Bütün cihazlar aynı Wi-Fi ağına bağlı olmalı. Misafir ağları ve bazı modemler cihazların birbirini görmesini engeller (istemci yalıtımı). Bu durumda bir telefonun mobil erişim noktasını (hotspot) açıp diğerlerini ona bağlayın; internet gerekmez.</p>
+  </div>
+</section>
+
+<!-- oda -->
+<section class="screen safe" id="sRoom" hidden>
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2 id="roomTitle">Oda</h2><button class="btn sm" id="roomLeave">Odadan çık</button></div>
+    <div class="cols">
+      <div class="box"><h3>Yarış</h3><div class="kv" id="roomInfo"></div></div>
+      <div class="box"><h3>Oyuncular</h3><div class="list" id="roomMembers"></div></div>
+    </div>
+    <div class="row"><button class="btn pri" id="roomStart" style="min-width:220px">Yarışı başlat</button><span class="note" id="roomWait"></span></div>
+  </div>
+</section>
+
+<!-- garaj -->
+<section class="screen safe" id="sGarage" hidden>
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2>Garaj</h2><button class="btn sm" data-back>Geri</button></div>
+    <div class="cols">
+      <div class="box"><h3>Dişli seti</h3><div class="seg" id="gGear"></div><p class="note" id="gGearNote"></p></div>
+      <div class="box"><h3>Motor</h3><div class="seg" id="gMotor"></div><p class="note" id="gMotorNote"></p></div>
+    </div>
+    <div class="box"><h3>Ölçülen performans (gerçek aracın fiziği)</h3><div id="gStats" class="list"></div>
+      <p class="note">Değerler oyundaki fizik modelinden: 203,6 g araç, 18650 pil, DC130 motorlar. Wi-Fi yarışlarında oda "herkes aynı araç" seçiliyse garaj ayarı kullanılmaz.</p></div>
+  </div>
+</section>
+
+<!-- ayarlar -->
+<section class="screen safe" id="sSettings" hidden>
+  <div class="card">
+    <div class="row" style="justify-content:space-between"><h2>Ayarlar</h2><button class="btn sm" data-back>Geri</button></div>
+    <div class="cols">
+      <div class="box"><h3>Grafik</h3><div class="seg" id="sQual"></div><p class="note" id="sQualNote"></p>
+        <div class="row"><span class="note">Kare hızı</span><div class="seg" id="sFps"></div></div>
+        <div class="row"><span class="note">Kamera</span><div class="seg" id="sCam"></div></div></div>
+      <div class="box"><h3>Kontrol</h3><div class="seg" id="sCtl"></div>
+        <label class="toggle"><span>Yan yatınca otomatik düzelt</span><input type="checkbox" id="sAutoReset"></label>
+        <div class="row"><span class="note" style="min-width:110px">Direksiyon</span><input type="range" id="sSteer" min="0.5" max="1.2" step="0.05"></div>
+        <div class="row"><span class="note" style="min-width:110px">Hassasiyet eğrisi</span><input type="range" id="sExpo" min="1" max="2" step="0.05"></div></div>
+      <div class="box"><h3>Ses ve titreşim</h3>
+        <label class="toggle"><span>Ses</span><input type="checkbox" id="sSound"></label>
+        <div class="row"><span class="note" style="min-width:110px">Ses düzeyi</span><input type="range" id="sVol" min="0" max="1" step="0.05"></div>
+        <label class="toggle"><span>Titreşim</span><input type="checkbox" id="sVib"></label>
+        <button class="btn sm" id="sDefaults">Varsayılanlara dön</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- duraklatma ve sonuçlar -->
+<section class="screen safe" id="sPause" hidden>
+  <div class="card" style="width:min(420px,100%)">
+    <h2>Duraklatıldı</h2><p class="note" id="pauseNote"></p>
+    <button class="btn pri" id="pResume">Devam et</button>
+    <button class="btn" id="pRestart">Yeniden başlat</button>
+    <button class="btn" id="pSettings">Ayarlar</button>
+    <button class="btn" id="pMenu">Ana menü</button>
+  </div>
+</section>
+<section class="screen safe" id="sResults" hidden>
+  <div class="card" style="width:min(640px,100%)">
+    <h2 id="resTitle">Sonuçlar</h2>
+    <div class="box"><table><thead><tr><th>#</th><th>Pilot</th><th>Süre</th><th>En iyi tur</th></tr></thead><tbody id="resBody"></tbody></table></div>
+    <div class="row"><button class="btn pri" id="resAgain">Tekrar yarış</button><button class="btn" id="resMenu">Ana menü</button></div>
+  </div>
+</section>
+<div id="loading">Yükleniyor…</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

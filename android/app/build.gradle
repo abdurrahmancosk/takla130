@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+// GitHub Actions her derlemede sürüm numarasını artırır: yeni APK eskisinin üstüne kurulur
+def runNo = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as Integer
+
+android {
+    namespace 'com.takla130.oyun'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.takla130.oyun'
+        minSdk 24
+        targetSdk 34
+        versionCode runNo
+        versionName "1.0.${runNo}"
+    }
+
+    // Sabit imza: her derleme aynı anahtarla imzalanır, güncelleme yaparken eski sürümü silmen gerekmez.
+    // Bu anahtar yalnızca bu oyun içindir (kişisel kullanım, mağaza değil).
+    signingConfigs {
+        takla {
+            storeFile file('takla130.p12')
+            storePassword 'takla130oyun'
+            keyAlias 'takla130'
+            keyPassword 'takla130oyun'
+            storeType 'pkcs12'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.takla
+        }
+        debug {
+            signingConfig signingConfigs.takla
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'androidx.core:core:1.13.1'
+}

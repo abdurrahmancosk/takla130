@@ -1,0 +1,11 @@
+# derleme çıktıları
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+# three.js derlemede indirilir
+android/app/src/main/assets/game/vendor/
+node_modules/
+cikti/
