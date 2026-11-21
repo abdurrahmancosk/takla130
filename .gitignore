@@ -7,5 +7,5 @@ android/.idea/
 *.iml
 # three.js derlemede indirilir
 android/app/src/main/assets/game/vendor/
-node_modules/
+node_modules
 cikti/

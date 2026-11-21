@@ -17,6 +17,13 @@ export const TRACKS = [
   { id: 'merkez', name: 'Merkez Turu', desc: 'Kısa ve hızlı, iki rampa', pts: [[L(1), L(1)], [L(4), L(1)], [L(4), L(4)], [L(1), L(4)]], laps: 3 },
   { id: 'rampa', name: 'Rampa Turu', desc: 'Atlama ve çift rampa dolu', pts: [[L(0), L(1)], [L(3), L(1)], [L(3), L(3)], [L(2), L(3)], [L(2), L(5)], [L(0), L(5)]], laps: 3 },
   { id: 'buyuk', name: 'Büyük Tur', desc: 'Şehrin çevresi, uzun düzlükler', pts: [[L(0), L(0)], [L(5), L(0)], [L(5), L(5)], [L(0), L(5)]], laps: 2 },
+  // gelişmiş pistler
+  { id: 'yilan', name: 'Yılan', desc: '12 viraj, bütün şehir boyunca zikzak', laps: 1, level: 'zor',
+    pts: [[L(1), L(0)], [L(5), L(0)], [L(5), L(1)], [L(1), L(1)], [L(1), L(2)], [L(5), L(2)], [L(5), L(3)], [L(1), L(3)], [L(1), L(4)], [L(5), L(4)], [L(5), L(5)], [L(0), L(5)], [L(0), L(0)]] },
+  { id: 'sekiz', name: 'Sekiz', desc: 'Kesişen kavşak, iki sıçrama ve masa', laps: 2, level: 'orta',
+    pts: [[L(1), L(1)], [L(4), L(1)], [L(4), L(5)], [L(5), L(5)], [L(5), L(3)], [L(1), L(3)]] },
+  { id: 'atlama', name: 'Atlama Kupası', desc: '6 atlama: sıçrama rampaları ve masalar', laps: 2, level: 'orta',
+    pts: [[L(2), L(0)], [L(4), L(0)], [L(4), L(2)], [L(5), L(2)], [L(5), L(4)], [L(2), L(4)]] },
 ];
 
 // rampalar: [x, z, yön dx, dz, L, H, genişlik, tür]   tür: 'k' sıçrama, 'd' çift (sıçrama + iniş)
@@ -30,6 +37,15 @@ const RAMPS = [
   [L(0), -4.6, 0, -1, 0.45, 0.07, 0.6, 'd'],
   [L(5), -4.2, 0, 1, 0.45, 0.06, 0.6, 'k'],
   [L(5), 4.2, 0, 1, 0.5, 0.075, 0.6, 'd'],
+  // gelişmiş pistlerin atlamaları (masalar iki yönde de geçilir; tek yönlü sıçramalar yalnız aynı yönde gidilen caddelerde)
+  [L(4), 4.2, 0, 1, 0.45, 0.06, 0.6, 'd'],
+  [4.2, L(0), 1, 0, 0.45, 0.06, 0.6, 'd'],
+  [L(4), -8.4, 0, 1, 0.45, 0.065, 0.6, 'd'],
+  [L(5), 0, 0, 1, 0.45, 0.06, 0.6, 'k'],
+  [8.4, L(4), -1, 0, 0.45, 0.06, 0.6, 'd'],
+  [0, L(4), -1, 0, 0.45, 0.06, 0.6, 'd'],
+  [L(2), -4.2, 0, -1, 0.45, 0.06, 0.6, 'k'],
+  [L(2), -8.4, 0, -1, 0.45, 0.07, 0.6, 'd'],
 ];
 
 export function buildWorld() {
