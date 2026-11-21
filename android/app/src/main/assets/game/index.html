@@ -233,6 +233,13 @@ tr.me td { color: var(--lime); font-weight: 800; }
         <div class="row"><span class="note">Kare hızı</span><div class="seg" id="sFps"></div></div>
         <div class="row"><span class="note">Kamera</span><div class="seg" id="sCam"></div></div></div>
       <div class="box"><h3>Kontrol</h3><div class="seg" id="sCtl"></div>
+        <div class="row"><span class="note" style="min-width:110px">Sürüş yardımı</span><div class="seg" id="sAssist"></div></div>
+        <p class="note" id="sAssistNote"></p>
+        <div id="tiltBox" class="list">
+          <div class="row"><span class="note" style="min-width:110px">Eğme açısı (tam dönüş)</span><input type="range" id="sTiltMax" min="12" max="40" step="1"></div>
+          <label class="toggle"><span>Eğme yönünü ters çevir</span><input type="checkbox" id="sTiltInv"></label>
+          <div class="row"><button class="btn sm" id="sTiltZero">Şu anki duruşu düz kabul et</button><span class="note" id="sTiltLive"></span></div>
+        </div>
         <label class="toggle"><span>Yan yatınca otomatik düzelt</span><input type="checkbox" id="sAutoReset"></label>
         <div class="row"><span class="note" style="min-width:110px">Direksiyon</span><input type="range" id="sSteer" min="0.5" max="1.2" step="0.05"></div>
         <div class="row"><span class="note" style="min-width:110px">Hassasiyet eğrisi</span><input type="range" id="sExpo" min="1" max="2" step="0.05"></div></div>
@@ -251,6 +258,7 @@ tr.me td { color: var(--lime); font-weight: 800; }
     <h2>Duraklatıldı</h2><p class="note" id="pauseNote"></p>
     <button class="btn pri" id="pResume">Devam et</button>
     <button class="btn" id="pRestart">Yeniden başlat</button>
+    <button class="btn" id="pTilt">Eğimi ortala (telefonu düz tut)</button>
     <button class="btn" id="pSettings">Ayarlar</button>
     <button class="btn" id="pMenu">Ana menü</button>
   </div>

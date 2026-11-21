@@ -34,7 +34,7 @@ const RAMPS = [
 
 export function buildWorld() {
   const R = rng(130);
-  const W = { tops: [], colliders: [], blocks: [], buildings: [], trees: [], lamps: [], cones: [], barrels: [], ramps: [], fountain: null, parkLines: [], grassZones: [] };
+  const W = { flying: [], vis: {}, tops: [], colliders: [], blocks: [], buildings: [], trees: [], lamps: [], cones: [], barrels: [], ramps: [], fountain: null, parkLines: [], grassZones: [] };
   const box = (c, h, yaw, mu, kind) => { const b = boxPoly(c, h, yaw, mu, kind); W.colliders.push(b); return b; };
 
   // --- bloklar
@@ -56,7 +56,7 @@ export function buildWorld() {
         box([along, CURB + 0.08, side], [0.018, 0.08, 0.018], 0, MU.wall, 'tree');
       }
     }
-    if (type !== 'park') for (const [lx, lz] of [[x0 + 0.09, z0 + 0.09], [x1 - 0.09, z1 - 0.09]]) {
+    if (type !== 'park') for (const [lx, lz] of [[x0 + 1.0, z0 + 0.09], [x1 - 1.0, z1 - 0.09]]) {          // köşelerde değil: viraj içinden geçen araç takılmasın
       W.lamps.push([lx, lz]); box([lx, CURB + 0.2, lz], [0.012, 0.2, 0.012], 0, MU.wall, 'lamp');
     }
     if (type === 'city') {
@@ -95,7 +95,7 @@ export function buildWorld() {
     } else if (type === 'parking') {
       for (let k = 0; k < 7; k++) W.parkLines.push([x0 + 0.35 + k * 0.42, z0 + 0.2, z0 + 0.75], [x0 + 0.35 + k * 0.42, z1 - 0.75, z1 - 0.2]);
       for (let k = 0; k < 6; k++) addCone(x0 + 0.5 + k * 0.42, cz + (k % 2 ? 0.12 : -0.12), CURB);        // slalom
-      for (let k = 0; k < 3; k++) { const bxp = x1 - 0.35, bzp = cz - 0.5 + k * 0.5; W.barrels.push([bxp, bzp, CURB]); box([bxp, CURB + 0.045, bzp], [0.035, 0.045, 0.035], 0, MU.cone, 'barrel'); }
+      for (let k = 0; k < 3; k++) { const bxp = x1 - 0.35, bzp = cz - 0.5 + k * 0.5; W.barrels.push([bxp, bzp, CURB]); const c = box([bxp, CURB + 0.045, bzp], [0.035, 0.045, 0.035], 0, MU.cone, 'barrel'); c.knock = 'barrel'; c.ci = W.barrels.length - 1; }
     }
   }
   function addRamp(x, z, dx, dz, Lr, H, Wd, kind, y0 = 0) {
@@ -114,7 +114,8 @@ export function buildWorld() {
     W.ramps.push({ x, z, dx, dz, L: Lr, H, W: Wd, yaw, y0 });
   }
   function addCone(x, z, y0 = 0) {
-    W.cones.push([x, z, y0]); box([x, y0 + 0.03, z], [0.022, 0.03, 0.022], 0, MU.cone, 'cone');
+    W.cones.push([x, z, y0]); const c = box([x, y0 + 0.03, z], [0.022, 0.03, 0.022], 0, MU.cone, 'cone');
+    c.knock = 'cone'; c.ci = W.cones.length - 1;                  // çarpınca savrulur, 10 s sonra yerine döner
   }
   for (const r of RAMPS) addRamp(...r);
 

@@ -8,7 +8,18 @@ import { sampleRemote } from './net.js';
 const TICK = 1 / 120;
 export const BOT_NAMES = ['Kıvılcım', 'Fırtına', 'Roket', 'Şimşek', 'Tornado', 'Pırpır', 'Zıpzıp'];
 export const BOT_COLORS = ['#e2621b', '#7b3fd1', '#18a0a6', '#d6336c', '#2f9e44', '#f08c00', '#495057'];
-export const DIFF = { kolay: { name: 'Kolay', thr: 0.74, look: 0.65, noise: 0.18 }, orta: { name: 'Orta', thr: 0.87, look: 0.6, noise: 0.1 }, zor: { name: 'Zor', thr: 1.0, look: 0.55, noise: 0.04 } };
+export const DIFF = { kolay: { name: 'Kolay', thr: 0.72, look: 0.65, noise: 0.18, band: 0.6 }, orta: { name: 'Orta', thr: 0.85, look: 0.6, noise: 0.1, band: 0.72 }, zor: { name: 'Zor', thr: 1.0, look: 0.55, noise: 0.04, band: 0.88 } };
+
+// sürüş yardımı (yalnız oyuncu): direksiyon önceliği, istenen dönüş hızına yaw kontrolü, yanal kaymayı sönümleme
+export const ASSIST = {
+  kapali: null,
+  // R: tam direksiyonda dönüş yarıçapı (m), rmax: en yüksek dönüş hızı (rad/s), keep: tam direksiyonda korunan gaz
+  normal: { R: 0.5, rmax: 5.0, yaw: 80, lat: 15, keep: 0.8 },
+  guclu: { R: 0.42, rmax: 6.0, yaw: 100, lat: 24, keep: 0.9 },
+};
+// çarpınca davranış: e = seksme katsayısı, hop = yukarı sıçrama, flip = takla (yalnız sert duvarlar)
+const HIT = { building: { e: 0.4, hard: true }, wall: { e: 0.45, hard: true }, barrier: { e: 0.5, hard: true }, fountain: { e: 0.45, hard: true },
+  table: { e: 0.4, hard: true }, lamp: { e: 0.6 }, tree: { e: 0.6 }, curb: { curb: true } };
 
 const quatFwd = (q) => { const [x, y, z, w] = q; return [1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y)]; };
 const quatUp = (q) => { const [x, y, z, w] = q; return [2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x)]; };
@@ -32,11 +43,11 @@ export class Game {
 
   makeDriver({ id, name, color, isBot, motor, gear, view }) {
     const s = this.ctx.settings;
-    const car = createCar(CP, { motor: MOTORS[motor || s.motor], G: CP.gears[gear || s.gear].ratio, mu: 0.9, Imax: 2.5, h: isBot ? 1 / 900 : 1 / 1600 });
+    const car = createCar(CP, { motor: MOTORS[motor || s.motor], G: CP.gears[gear || s.gear].ratio, mu: 0.9, Imax: 2.5, zB: 0.45, h: isBot ? 1 / 900 : 1 / 1600 });
     const v = makeCarView(view, color);
     this.ctx.R.scene.add(v.root); this.ctx.R.scene.add(v.blob);
     const d = { id, name, color, isBot, car, view: v, ground: halfSpace([0, 1, 0], 0, 0.9), inv: false, ctrl: [0, 0], cmd: { thr: 0, st: 0 }, flipT: 0,
-      stuckT: 0, sideT: 0, ai: isBot ? { lane: 0, revT: 0, tries: 0, seed: Math.random() * 100 } : null, r: null, list: [] };
+      stuckT: 0, sideT: 0, hitT: 0, ai: isBot ? { lane: 0, revT: 0, tries: 0, seed: Math.random() * 100 } : null, r: null, list: [] };
     return d;
   }
   clear() {
@@ -118,16 +129,24 @@ export class Game {
       let thr = 0, st = 0;
       if (!d.isBot) { thr = input.thr; st = input.st; if (input.flip && d.flipT <= 0 && S.v[0] ** 2 + S.v[2] ** 2 > 0.6) d.flipT = 0.32; }
       else if (running) [thr, st] = this.botDrive(d);
+      const A = !d.isBot && d.flipT <= 0 ? ASSIST[this.ctx.settings.assist || 'normal'] : null;
+      let stMotor = st;
+      if (A) {
+        // yüksek hızda dönüşü motorlar arası fark değil yardım yapar (fark aracı yavaşlatıp kaydırıyordu); düşük hızda tank gibi yerinde döner
+        const sp = Math.hypot(S.v[0], S.v[2]);
+        stMotor = st * Math.max(0.15, Math.min(1, 1 - (sp - 0.4) / 1.6));
+        thr = Math.sign(thr) * Math.min(Math.abs(thr), 1 - Math.abs(st) * (1 - A.keep));
+      }
       if (d.flipT > 0) { d.flipT -= h; thr = -1; st = 0; }        // takla: ileri giderken kısa süre tam geri
       if (!running || (d.r && d.r.fin)) { thr = 0; st = 0; if (d.r && d.r.fin) thr = 0; }
       const upY = d.car.S.upY ?? 1;
       if (upY < -0.3) d.inv = true; else if (upY > 0.3) d.inv = false;
-      d.ctrl = mix(thr, st);
+      d.ctrl = mix(thr, A ? stMotor : st);
       // çevre
       // ön eleme: aracın merkezinden 0,14 m'den uzak cisimleri bu adımda hiç hesaba katma (fizik maliyetinin çoğu buradaydı)
       const cand = W.query(x, z, 0.45, d.list), list = d.near || (d.near = []); list.length = 0;
       const y = S.p[1], margin = 0.14 + Math.hypot(S.v[0], S.v[1], S.v[2]) * h * 2;
-      for (const c of cand) { let m = -1e9; for (const pl of c.planes) { const v = pl.n[0] * x + pl.n[1] * y + pl.n[2] * z - pl.d; if (v > m) m = v; } if (m < margin) list.push(c); }
+      for (const c of cand) { if (c.dead) continue; let m = -1e9; for (const pl of c.planes) { const v = pl.n[0] * x + pl.n[1] * y + pl.n[2] * z - pl.d; if (v > m) m = v; } if (m < margin) list.push(c); }
       d.ground.mu = W.surfaceMu(x, z); list.push(d.ground);
       for (const o of others) {
         if (o.id === d.id) continue;
@@ -137,8 +156,49 @@ export class Game {
       }
       d.car.setWorld(list);
       d.car.step(h, d.ctrl[0], d.ctrl[1]);
+      if (A) this.assist(d, A, st, h);
+      this.impacts(d, h);
       this.watchdog(d, h);
       if (R && running) this.progress(d, h);
+    }
+  }
+  assist(d, A, st, h) {
+    const S = d.car.S;
+    if (!d.car.wheelsB.some(w => w.contact)) return;           // havadayken (takla, sıçrama) dokunma
+    const sp = Math.hypot(S.v[0], S.v[2]);
+    if (sp < 0.35) return;                                     // yavaşken tank dönüşü kendi yeter
+    const f0 = quatFwd(S.q), fwdSpeed = (S.v[0] * f0[0] + S.v[2] * f0[2]) * (d.inv ? -1 : 1);
+    const dir = fwdSpeed < -0.2 ? -1 : 1;                      // geri giderken direksiyon araba gibi ters çalışır
+    const target = -st * dir * Math.min(A.rmax, sp / A.R);     // dünya Y; eksi = saat yönü = sağa
+    S.w[1] += (target - S.w[1]) * Math.min(1, h * A.yaw);
+    const f = quatFwd(S.q), fl = Math.hypot(f[0], f[2]) || 1, rx = -f[2] / fl, rz = f[0] / fl;
+    const vl = S.v[0] * rx + S.v[2] * rz, k = Math.min(1, h * A.lat);
+    S.v[0] -= rx * vl * k; S.v[2] -= rz * vl * k;              // yana kaymayı azalt: daha çok tutunma
+  }
+  // çarpma tepkileri: direk/ağaçtan seker, kaldırımda zıplar, duvara sert çarpınca takla atar, duba/varil savrulur
+  impacts(d, h) {
+    const S = d.car.S, x = S.p[0], y = S.p[1], z = S.p[2];
+    if (d.hitT > 0) d.hitT -= h;
+    for (const c of d.near) {
+      if (!c.half || c.dead) continue;
+      let m = -1e9, n = null;
+      for (const pl of c.planes) { const v = pl.n[0] * x + pl.n[1] * y + pl.n[2] * z - pl.d; if (v > m) { m = v; n = pl.n; } }
+      if (Math.abs(n[1]) > 0.5 || m > 0.085) continue;           // üstünde duruyor ya da değmiyor
+      const vn = S.v[0] * n[0] + S.v[2] * n[2], a = -vn;
+      if (c.knock) {
+        if (a > 0.15) { c.dead = true; this.ctx.onKnock && this.ctx.onKnock(c, S.v.slice(), d); S.v[0] *= 0.88; S.v[2] *= 0.88; S.v[1] += 0.12; }
+        continue;
+      }
+      const H = HIT[c.kind]; if (!H) continue;
+      if (!H.hard && !H.curb && m < 0.075) { S.p[0] += n[0] * 0.002; S.p[2] += n[2] * 0.002; }   // direğe sıkışmasın: yavaşça dışarı it
+      if (d.hitT > 0 || a < 0.6) continue;
+      d.hitT = 0.25;
+      if (H.curb) { if (a > 0.8 && y < c.center[1] + c.half[1] + 0.05) S.v[1] += 0.2 * a; continue; }   // kaldırıma çarpınca hopla
+      S.v[0] += n[0] * a * (1 + H.e); S.v[2] += n[2] * a * (1 + H.e);
+      S.v[1] += H.hard ? 0.2 + 0.25 * a : 0.15 + 0.1 * a;
+      if (H.hard && a > 1.1) { S.w[0] += n[2] * 6.5 * a; S.w[2] += -n[0] * 6.5 * a; }   // burun yukarı: takla
+      else if (!H.hard) S.w[1] += (Math.random() - 0.5) * 6;                              // direkten sekip yön değiştir
+      this.ctx.onImpact && this.ctx.onImpact(d, a, c.kind);
     }
   }
   // takıldı / ters / düştü kontrolü
@@ -147,6 +207,15 @@ export class Game {
     if (S.p[1] < -0.5 || Math.abs(S.p[0]) > 14 || Math.abs(S.p[2]) > 14 || !isFinite(S.p[0])) { this.respawn(d); return; }
     if (Math.abs(up) < 0.35) d.sideT += h; else d.sideT = 0;               // yan yatmış
     if (d.sideT > (d.isBot ? 1.5 : 3.0)) { if (d.isBot || this.ctx.settings.autoReset) this.respawn(d); d.sideT = 0; }
+    if (!d.isBot) {                                            // oyuncu: gaz basılıyken 1 s kıpırdamazsa hoplayıp kurtulsun
+      const pushing = Math.abs(d.ctrl[0]) + Math.abs(d.ctrl[1]) > 0.8, grounded = d.car.wheelsB.some(w => w.contact);
+      if (pushing && grounded && sp < 0.05) d.stuckT += h; else d.stuckT = Math.max(0, d.stuckT - h * 2);
+      if (d.stuckT > 1.0) {
+        d.stuckT = 0; const f = quatFwd(S.q), sg = (d.inv ? -1 : 1) * Math.sign(d.ctrl[0] + d.ctrl[1] || 1);
+        S.v[0] -= f[0] * sg * 0.35; S.v[2] -= f[2] * sg * 0.35; S.v[1] += 0.55;
+        this.ctx.onImpact && this.ctx.onImpact(d, 0.7, 'unstick');
+      }
+    }
     if (d.isBot) {
       const pushing = Math.abs(d.ctrl[0]) + Math.abs(d.ctrl[1]) > 0.6;
       if (pushing && sp < 0.06) d.stuckT += h; else d.stuckT = Math.max(0, d.stuckT - h);
@@ -181,7 +250,20 @@ export class Game {
     let thr = ai.diff.thr * (1 - Math.min(0.4, curv * 0.36));
     if (Math.abs(err) > 0.9) thr = 0.4;
     thr += (Math.sin(this.raceTime() * 1.7 + ai.seed) * 0.5) * ai.diff.noise;
+    // lastik bandı: en iyi insan oyuncudan öndeyse yavaşla, gerideyse tam gaz (zorlukta daha az)
+    const lead = this.humanBest();
+    if (lead !== null) {
+      const gap = d.r.pr - lead;                                  // + : bot önde
+      if (gap > 1.5) thr *= Math.max(ai.diff.band, 1 - (gap - 1.5) * 0.06);
+      else if (gap < -2) thr = Math.min(1, thr * 1.1);
+    }
     return [Math.max(-1, Math.min(1, thr)), st];
+  }
+  humanBest() {
+    let best = null;
+    const P = this.player; if (P && P.r && !P.r.fin) best = P.r.pr;
+    for (const rv of this.remotes.values()) if (rv.p.race && !rv.p.race.fin && !rv.p.bot) best = best === null ? rv.p.race.pr : Math.max(best, rv.p.race.pr);
+    return best;
   }
   // ---------------------------------------------------------------- tur ve sıralama
   progress(d, h) {

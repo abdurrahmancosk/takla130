@@ -172,8 +172,8 @@ export function buildCity(scene, W, Q) {
   inst(new THREE.IcosahedronGeometry(1, 0), lam({ color: '#4f8a3c', flatShading: true }), W.trees, (o, [x, z, s]) => { reset(); o.position.set(x, CURB + 0.18 + s * 0.7, z); o.scale.setScalar(s * 0.55); });
   inst(new THREE.CylinderGeometry(0.006, 0.009, 0.42, 6), lam({ color: '#3c4148' }), W.lamps, (o, [x, z]) => { reset(); o.position.set(x, CURB + 0.21, z); });
   inst(new THREE.BoxGeometry(0.05, 0.012, 0.025), lam({ color: '#fff6c8', emissive: '#6b6230' }), W.lamps, (o, [x, z]) => { reset(); o.position.set(x + 0.02, CURB + 0.42, z); });
-  inst(new THREE.ConeGeometry(0.022, 0.06, 10), lam({ color: '#f26a1b' }), W.cones, (o, [x, z, y0]) => { reset(); o.position.set(x, y0 + 0.03, z); });
-  inst(new THREE.CylinderGeometry(0.034, 0.034, 0.09, 12), lam({ color: '#e45a1e' }), W.barrels, (o, [x, z, y0]) => { reset(); o.position.set(x, (y0 || 0) + 0.045, z); });
+  W.vis.cones = inst(new THREE.ConeGeometry(0.022, 0.06, 10), lam({ color: '#f26a1b' }), W.cones, (o, [x, z, y0]) => { reset(); o.position.set(x, y0 + 0.03, z); });
+  W.vis.barrels = inst(new THREE.CylinderGeometry(0.034, 0.034, 0.09, 12), lam({ color: '#e45a1e' }), W.barrels, (o, [x, z, y0]) => { reset(); o.position.set(x, (y0 || 0) + 0.045, z); });
 
   // masa atlamaların düz üstleri
   if (W.tops.length) {
@@ -303,4 +303,32 @@ export function makeCarView(kind, color) {
     },
     setBlob(x, y, z, a) { blob.position.set(x, y + 0.0015, z); blob.material.opacity = a; blob.visible = a > 0.02; },
   };
+}
+
+// ------------------------------------------------------------------ çarpılan duba ve variller savrulur, 10 s sonra yerine döner
+const fo = new THREE.Object3D();
+export function knock(W, c, v) {
+  const mesh = c.knock === 'cone' ? W.vis.cones : W.vis.barrels; if (!mesh) return;
+  const sp = Math.hypot(v[0], v[2]);
+  W.flying.push({ mesh, k: c.ci, c, p: c.center.slice(), v: [v[0] * 1.35, 0.6 + sp * 0.35, v[2] * 1.35], r: [0, 0, 0],
+    w: [(Math.random() - 0.5) * 24, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 24], t: 0, h: c.half[1], rest: false });
+}
+export function updateFlying(W, dt) {
+  for (let i = W.flying.length - 1; i >= 0; i--) {
+    const f = W.flying[i]; f.t += dt;
+    if (f.t > 10) {                                       // yerine dön
+      fo.position.set(...f.c.center); fo.rotation.set(0, 0, 0); fo.updateMatrix();
+      f.mesh.setMatrixAt(f.k, fo.matrix); f.mesh.instanceMatrix.needsUpdate = true; f.c.dead = false; W.flying.splice(i, 1); continue;
+    }
+    if (!f.rest) {
+      f.v[1] -= 9.81 * dt;
+      for (let a = 0; a < 3; a++) { f.p[a] += f.v[a] * dt; f.r[a] += f.w[a] * dt; }
+      if (f.p[1] < f.h * 0.75) {
+        f.p[1] = f.h * 0.75; f.v[1] = Math.abs(f.v[1]) * 0.3; f.v[0] *= 0.55; f.v[2] *= 0.55; f.w = f.w.map(x => x * 0.5);
+        if (Math.hypot(...f.v) < 0.15) { f.rest = true; f.r = [Math.PI / 2, f.r[1], 0]; }
+      }
+    }
+    fo.position.set(...f.p); fo.rotation.set(...f.r); fo.updateMatrix();
+    f.mesh.setMatrixAt(f.k, fo.matrix); f.mesh.instanceMatrix.needsUpdate = true;
+  }
 }

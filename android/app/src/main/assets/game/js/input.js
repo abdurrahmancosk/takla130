@@ -23,7 +23,7 @@ export class Input {
       let dx = e.clientX - s.x0, dy = e.clientY - s.y0; const l = Math.hypot(dx, dy);
       if (l > s.R) { dx *= s.R / l; dy *= s.R / l; }
       const two = this.s.controls === 'iki';
-      if (two) { if (s.side === 'L') dx = 0; else dy = 0; }
+      if (two || this.s.controls === 'egim') { if (s.side === 'L') dx = 0; else dy = 0; }
       s.dx = dx / s.R; s.dy = dy / s.R;
       s.knob.style.transform = `translate(${dx}px, ${dy}px)`;
     };
@@ -39,6 +39,24 @@ export class Input {
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => { this.keys.clear(); for (const id in this.sticks) up({ pointerId: +id }); });
     this.padPrev = [];
+    // eğerek direksiyon: ekran düzlemindeki yerçekimi yönü (telefonu direksiyon gibi sağa/sola yatır)
+    this.tilt = { ok: false, raw: 0, zero: 0 };
+    window.addEventListener('devicemotion', (e) => {
+      const g = e.accelerationIncludingGravity; if (!g || g.x == null || g.y == null) return;
+      const a = ((screen.orientation && screen.orientation.angle) ?? window.orientation ?? 90 + 360) % 360;
+      let gx, gy;
+      if (a === 90) { gx = -g.y; gy = g.x; } else if (a === 270) { gx = g.y; gy = -g.x; } else if (a === 180) { gx = -g.x; gy = -g.y; } else { gx = g.x; gy = g.y; }
+      if (Math.hypot(gx, gy) < 2) return;                    // telefon düz yatıyorsa açı anlamsız
+      const ang = Math.atan2(-gx, gy) * 180 / Math.PI;       // + : sağa yatık
+      this.tilt.raw = this.tilt.ok ? this.tilt.raw * 0.7 + ang * 0.3 : ang; this.tilt.ok = true;
+    });
+  }
+  calibrate() { if (this.tilt.ok) this.tilt.zero = Math.max(-20, Math.min(20, this.tilt.raw)); }
+  tiltSteer() {
+    if (!this.tilt.ok) return 0;
+    let d = (this.tilt.raw - this.tilt.zero) * (this.s.tiltInvert ? -1 : 1);
+    d = Math.abs(d) < 1.5 ? 0 : d - Math.sign(d) * 1.5;      // ölü bölge
+    return Math.max(-1, Math.min(1, d / (this.s.tiltMax || 24)));
   }
   bindButton(id, what) {
     const b = document.getElementById(id); if (!b) return;
@@ -49,8 +67,9 @@ export class Input {
   read() {
     const curve = (v) => Math.sign(v) * Math.pow(Math.abs(v), this.s.expo || 1.35);
     let thr = 0, st = 0;
+    if (this.s.controls === 'egim') st = this.tiltSteer();
     for (const s of Object.values(this.sticks)) {
-      if (this.s.controls === 'iki') { if (s.side === 'L') thr = -(s.dy || 0); else st = s.dx || 0; }
+      if (this.s.controls === 'iki' || this.s.controls === 'egim') { if (s.side === 'L') thr = -(s.dy || 0); else st = s.dx || 0; }
       else if (s.side === 'L') { thr = -(s.dy || 0); st = s.dx || 0; }
     }
     const K = this.keys;
@@ -70,7 +89,7 @@ export class Input {
       break;
     }
     this.thr = curve(Math.max(-1, Math.min(1, thr))) * (this.s.throttleLimit || 1);
-    this.st = curve(Math.max(-1, Math.min(1, st))) * (this.s.steerGain || 1);
+    this.st = (this.s.controls === 'egim' && !Object.values(this.sticks).some(x => x.side === 'R') ? Math.max(-1, Math.min(1, st)) : curve(Math.max(-1, Math.min(1, st)))) * (this.s.steerGain || 1);
     const out = { thr: this.thr, st: Math.max(-1, Math.min(1, this.st)), flip: this._flip, reset: this._reset, cam: this._cam, pause: this._pause };
     this._flip = this._reset = this._cam = this._pause = false;
     return out;

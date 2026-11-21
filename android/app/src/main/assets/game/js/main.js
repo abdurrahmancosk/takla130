@@ -1,7 +1,7 @@
 // TAKLA-130 oyunu: menüler, oyun döngüsü, kamera, gösterge, mini harita, ağ olayları.
 import * as THREE from 'three';
 import { buildWorld, TRACKS, heightAt } from './world.js';
-import { createRenderer, buildCity, buildTrackDecor, loadCarModels, autoQuality, QUALITY } from './render.js';
+import { createRenderer, buildCity, buildTrackDecor, loadCarModels, autoQuality, QUALITY, knock, updateFlying } from './render.js';
 import { Game, DIFF, quatFwd, quatUp } from './game.js';
 import { Net } from './net.js';
 import { Input } from './input.js';
@@ -14,7 +14,7 @@ const GARAGE = { DENGE_strong: { top: 13, t5: 0.22 }, DENGE_medium: { top: 10.5,
   TAKLA_medium: { top: 9.3, t5: 0.27 }, TAKLA_weak: { top: 4.8, t5: null }, HIZ_strong: { top: 14.5, t5: 0.23 }, HIZ_medium: { top: 11.8, t5: 0.28 }, HIZ_weak: { top: 6.1, t5: 0.72 } };
 
 // ------------------------------------------------------------------ ayarlar (cihazda saklanır)
-const DEF = { name: '', color: COLORS[0], quality: 'oto', fps: 60, cam: 'takip', controls: 'iki', autoReset: true, steerGain: 0.85, expo: 1.35,
+const DEF = { name: '', color: COLORS[0], quality: 'oto', fps: 60, cam: 'takip', controls: 'iki', assist: 'normal', tiltMax: 24, tiltInvert: false, autoReset: true, steerGain: 0.85, expo: 1.35,
   sound: true, volume: 0.7, vib: true, gear: 'DENGE', motor: 'medium', rTrack: 0, rLaps: 3, rBots: 3, rDiff: 'orta', oTrack: 0, oLaps: 3, oBots: 2, oDiff: 'orta', best: {} };
 const S = (() => { let s = {}; try { s = JSON.parse(localStorage.getItem('takla130') || '{}'); } catch (e) { } return { ...DEF, ...s }; })();
 if (!S.name) S.name = 'Pilot' + Math.floor(10 + Math.random() * 89);
@@ -41,7 +41,10 @@ const hud = {
   finished(t, best) { this.toast('BİTTİ! ' + fmt(t), 2500); vib(120); saveBest(t, best); },
   results(list) { showResults(list); },
 };
-const game = new Game({ R, W, net, settings: S, hud, audio, buildDecor: (tr) => buildTrackDecor(R.scene, tr) });
+const game = new Game({ R, W, net, settings: S, hud, audio, buildDecor: (tr) => buildTrackDecor(R.scene, tr),
+  onKnock: (c, v, d) => { knock(W, c, v); if (d === game.player) { audio.bump(0.35); vib(15); } },
+  onImpact: (d, a, kind) => { if (d === game.player) { audio.bump(Math.min(1, a / 2)); if (a > 1) vib(Math.min(70, 20 + a * 15)); if (kind === 'building' || kind === 'wall') { if (a > 1.1) hud.toast('ÇARPTI!', 700); } } },
+});
 
 function fmt(t) { if (!t && t !== 0) return '–'; const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s < 10 ? '0' : ''}${s.toFixed(1).replace('.', ',')}`; }
 function saveBest(t, best) {
@@ -57,7 +60,9 @@ let state = 'menu', returnTo = 'sMenu';
 function show(id) { for (const s of screens) $(s).hidden = s !== id; if (id) refresh[id]?.(); }
 function playing(on) {
   for (const id of ['hud', 'ctl', 'actions', 'stickL', 'stickR']) $(id).hidden = !on;
-  $('hintL').hidden = $('hintR').hidden = !on || S.controls !== 'iki';
+  $('hintL').hidden = $('hintR').hidden = !on || S.controls === 'tek';
+  $('hintR').textContent = S.controls === 'egim' ? 'telefonu sağa / sola yatır' : 'sağ yarı: sağa / sola';
+  $('stickR').style.visibility = S.controls === 'egim' ? 'hidden' : '';
   if (!on) { input.releaseAll(); audio.silence(); $('countWrap').hidden = true; $('wrongWrap').hidden = true; }
 }
 document.querySelectorAll('[data-back]').forEach(b => b.addEventListener('click', () => show(returnTo)));
@@ -134,7 +139,14 @@ refresh.sSettings = () => {
   $('sQualNote').textContent = `Şu an: ${QUALITY[qk].label}${S.quality === 'oto' ? ' (otomatik)' : ''}. Kare hızı düşerse çözünürlük kendiliğinden azalır.`;
   seg($('sFps'), [[30, '30'], [60, '60']], S.fps, v => { S.fps = v; save(); });
   seg($('sCam'), [['takip', 'Takip'], ['uzak', 'Uzak'], ['ust', 'Üstten'], ['surucu', 'Sürücü']], S.cam, v => { S.cam = v; save(); });
-  seg($('sCtl'), [['iki', 'İki çubuk (kumanda gibi)'], ['tek', 'Tek çubuk']], S.controls, v => { S.controls = v; save(); });
+  seg($('sCtl'), [['iki', 'İki çubuk (kumanda gibi)'], ['tek', 'Tek çubuk'], ['egim', 'Eğerek dön']], S.controls, v => { S.controls = v; save(); $('tiltBox').hidden = v !== 'egim'; input.calibrate(); });
+  $('tiltBox').hidden = S.controls !== 'egim';
+  const AN = { kapali: 'Gerçek araç: yüksek hızda dönüş zor.', normal: 'Önerilen: yüksek hızda keskin döner, kaymaz.', guclu: 'En kolay: dar virajlar, en çok tutunma.' };
+  seg($('sAssist'), [['kapali', 'Kapalı'], ['normal', 'Normal'], ['guclu', 'Güçlü']], S.assist, v => { S.assist = v; save(); $('sAssistNote').textContent = AN[v]; });
+  $('sAssistNote').textContent = AN[S.assist] || '';
+  $('sTiltInv').checked = !!S.tiltInvert; $('sTiltInv').onchange = () => { S.tiltInvert = $('sTiltInv').checked; save(); };
+  $('sTiltMax').value = S.tiltMax; $('sTiltMax').oninput = () => { S.tiltMax = +$('sTiltMax').value; save(); };
+  $('sTiltZero').onclick = () => { input.calibrate(); hud.toast('Eğim ortalandı', 900); };
   const ck = (id, k, after) => { const e = $(id); e.checked = !!S[k]; e.onchange = () => { S[k] = e.checked; save(); after && after(); }; };
   ck('sAutoReset', 'autoReset'); ck('sSound', 'sound', () => audio.setEnabled()); ck('sVib', 'vib');
   const rg = (id, k, after) => { const e = $(id); e.value = S[k]; e.oninput = () => { S[k] = +e.value; save(); after && after(); }; };
@@ -199,13 +211,13 @@ net.on('results', (list) => { if (game.race && game.race.online && !game.race.re
 
 // ------------------------------------------------------------------ oturum
 function startFree() {
-  audio.unlock(); state = 'free'; net.mode = 'free';
+  audio.unlock(); state = 'free'; net.mode = 'free'; input.calibrate();
   game.startFree(); show(null); playing(true);
   $('raceInfo').hidden = true; $('lapInfo').hidden = true; $('stand').innerHTML = '';
   drawMiniBase(null); hud.toast('Serbest sürüş', 1000);
 }
 function startRace(o) {
-  audio.unlock(); state = 'race'; if (!o.online) net.mode = 'menu';
+  audio.unlock(); state = 'race'; if (!o.online) net.mode = 'menu'; input.calibrate();
   game.startRace(o); show(null); playing(true);
   $('raceInfo').hidden = false; $('lapInfo').hidden = true;
   drawMiniBase(game.race.tr); lastCount = 99; paused = false;
@@ -250,6 +262,7 @@ $('bPause').onclick = () => pause(true);
 $('pResume').onclick = () => pause(false);
 $('pRestart').onclick = () => { if (state === 'free') { pause(false); game.startFree(); } else if (game.race) { const r = game.race; startRace({ track: W.tracks.indexOf(r.tr), laps: r.laps, bots: S.rBots, diff: S.rDiff, online: false, startLocal: performance.now() + 3500 }); } };
 $('pSettings').onclick = () => { returnTo = 'sPause'; show('sSettings'); };
+$('pTilt').onclick = () => { input.calibrate(); hud.toast('Eğim ortalandı', 900); };
 $('pMenu').onclick = () => toMenu();
 
 // Android geri tuşu
@@ -341,6 +354,7 @@ function loop(t) {
     if (inp.cam) { camMode = CAMS[(CAMS.indexOf(camMode) + 1) % CAMS.length]; S.cam = camMode; save(); hud.toast({ takip: 'Takip kamerası', uzak: 'Uzak kamera', ust: 'Üstten kamera', surucu: 'Sürücü kamerası' }[camMode], 800); }
     if (inp.reset && game.player) game.respawn(game.player);
     game.update(dt, inp);
+    updateFlying(W, dt);
     if (game.race) game.checkEnd();
     game.netSync();
     gameFeedback(dt);
@@ -363,6 +377,7 @@ function loop(t) {
     if (state === 'menu') updateStatus();
   }
   if (state !== 'menu' && t - hudT > 100) { hudT = t; updateHud(); }
+  if (!$('sSettings').hidden && S.controls === 'egim') $('sTiltLive').textContent = input.tilt.ok ? `şu an ${Math.round(input.tiltSteer() * 100)}%` : 'eğim algılayıcısı yok';
 }
 function gameFeedback(dt) {
   const P = game.player; if (!P) return;
@@ -404,4 +419,4 @@ function updateHud() {
   } catch (e) { console.warn('model yüklenemedi, basit araç kullanılacak', e); }
   $('loading').hidden = true; show('sMenu'); requestAnimationFrame(loop);
 })();
-window.__game = { game, net, W, S };       // test için
+window.__game = { game, net, W, S, input };       // test için
